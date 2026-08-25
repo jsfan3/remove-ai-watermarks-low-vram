@@ -43,9 +43,7 @@ def line_payload(line: Any) -> dict[str, Any]:
 
 def check_geometry(lines: list[Any], width: int, height: int) -> None:
     if len(lines) > MAX_AUTOMATIC_LINES:
-        raise RuntimeError(
-            f"The detector proposed {len(lines)} lines, exceeding the {MAX_AUTOMATIC_LINES} limit."
-        )
+        raise RuntimeError(f"The detector proposed {len(lines)} lines, exceeding the {MAX_AUTOMATIC_LINES} limit.")
     image_area = width * height
     total_area = 0
     for index, line in enumerate(lines, start=1):
@@ -155,11 +153,11 @@ def main() -> int:
     if not 0.5 <= args.min_text_score <= 1.0:
         parser.error("--min-text-score must be between 0.5 and 1.0")
 
+    import remove_ai_watermarks.text_draft as text_draft
     from remove_ai_watermarks._internal.text_restoration import (
         VerifiedTextLine,
         source_pixel_sha256,
     )
-    import remove_ai_watermarks.text_draft as text_draft
 
     source = open_rgb(args.source)
     candidate = open_rgb(args.candidate)
@@ -206,9 +204,8 @@ def main() -> int:
             for ratio in text_draft.JITTER_RATIOS
         ]
         candidate_text = text_draft.stable_recognition(reads, args.min_text_score)
-        same = (
-            candidate_text is not None
-            and text_draft.normalize_text(candidate_text) == text_draft.normalize_text(line.text)
+        same = candidate_text is not None and text_draft.normalize_text(candidate_text) == text_draft.normalize_text(
+            line.text
         )
         if args.restore_all_text or not same:
             selected.append(line)

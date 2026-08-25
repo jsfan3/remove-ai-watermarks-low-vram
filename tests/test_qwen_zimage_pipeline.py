@@ -243,7 +243,7 @@ def test_face_stage_loads_in_its_own_dtype_when_the_global_stage_differs(monkeyp
 @pytest.mark.parametrize("disable_tiling", [False, True])
 def test_sdxl_cpu_offload_can_disable_only_vae_tiling(monkeypatch, disable_tiling):
     """Quality mode keeps the memory-safe hooks but skips tiled VAE processing."""
-    import diffusers
+    diffusers = pytest.importorskip("diffusers")
     import huggingface_hub
     import torch
 

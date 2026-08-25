@@ -229,6 +229,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"cleanImageTextDraft.py" = ["T201"]  # CLI progress and summary output
+"cleanImageTextRestore.py" = ["T201"]  # CLI progress and error output
 "scripts/*.py" = ["G004", "S108", "S310", "T20"]
 "tests/*.py" = ["ANN", "S101", "S105", "S106", "S108"]
 "src/remove_ai_watermarks/_internal/watermark_remover.py" = ["S603", "S606", "S607"]  # nvidia-smi capability probe

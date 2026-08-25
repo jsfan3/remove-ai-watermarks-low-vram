@@ -43,9 +43,7 @@ def line_payload(line: Any) -> dict[str, Any]:
     }
 
 
-def text_crop_box(
-    box: tuple[int, int, int, int], width: int, height: int
-) -> tuple[int, int, int, int]:
+def text_crop_box(box: tuple[int, int, int, int], width: int, height: int) -> tuple[int, int, int, int]:
     """Return a context-rich crop whose centre contains one detected text box."""
     x1, y1, x2, y2 = box
     line_height = max(1, y2 - y1)
@@ -105,9 +103,7 @@ def qwen_text_donor(source: Image.Image, lines: list[Any], *, device_name: str) 
                 mode="edge",
             )
         padded = Image.fromarray(crop_array)
-        tensor = processor.preprocess(padded).unsqueeze(2).to(
-            device=active_device, dtype=active_dtype
-        )
+        tensor = processor.preprocess(padded).unsqueeze(2).to(device=active_device, dtype=active_dtype)
         with torch.inference_mode():
             latents = vae.encode(tensor).latent_dist.mode()
             decoded = vae.decode(latents, return_dict=False)[0][:, :, 0]
@@ -123,10 +119,7 @@ def qwen_text_donor(source: Image.Image, lines: list[Any], *, device_name: str) 
     for index, line in enumerate(lines, start=1):
         crop_box = text_crop_box(line.box, source.width, source.height)
         crop = source.crop(crop_box)
-        progress(
-            f"VAE reconstruction of text crop {index}/{len(lines)}: "
-            f"{crop.width}x{crop.height}"
-        )
+        progress(f"VAE reconstruction of text crop {index}/{len(lines)}: {crop.width}x{crop.height}")
         try:
             reconstructed = execute(crop, tiled=False)
         except RuntimeError as error:
@@ -155,7 +148,6 @@ def qwen_text_donor(source: Image.Image, lines: list[Any], *, device_name: str) 
         if active_device == "cuda":
             torch.cuda.empty_cache()
 
-    del vae
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -203,9 +195,7 @@ def restore(args: argparse.Namespace) -> int:
     source = open_rgb(args.source)
     candidate = open_rgb(args.candidate)
     if source.size != candidate.size:
-        raise RuntimeError(
-            f"Source and candidate have different sizes: {source.size} versus {candidate.size}"
-        )
+        raise RuntimeError(f"Source and candidate have different sizes: {source.size} versus {candidate.size}")
 
     raw_manifest = json.loads(args.text_manifest.read_text(encoding="utf-8"))
     if raw_manifest.get("verified") is False and not raw_manifest.get("lines"):
