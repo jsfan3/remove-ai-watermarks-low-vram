@@ -3,6 +3,9 @@
 For metadata-only operations, the heavy ML dependencies are NOT required.
 """
 
+# Modified by remove-ai-watermarks-low-vram: JPEG output uses quality 100 and
+# 4:4:4 chroma to minimize additional loss when metadata is removed.
+
 from __future__ import annotations
 
 import contextlib
@@ -1560,9 +1563,9 @@ def remove_ai_metadata(
         save_kwargs: dict[str, Any] = {"format": fmt}
         if fmt == "JPEG":
             # JPEG output is unavoidably lossy, so minimize the loss: high quality
-            # and no chroma subsampling (4:4:4). Without these PIL defaults to
+            # 100 and no chroma subsampling (4:4:4). Without these PIL defaults to
             # quality 75 + 4:2:0, which visibly degrades a re-saved image.
-            save_kwargs["quality"] = 95
+            save_kwargs["quality"] = 100
             save_kwargs["subsampling"] = 0
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")

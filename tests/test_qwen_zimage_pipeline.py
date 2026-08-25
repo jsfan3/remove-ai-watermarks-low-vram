@@ -1,5 +1,7 @@
 """Tests for the Qwen 2512 + Z-Image SynthID removal profile."""
 
+# Modified by remove-ai-watermarks-low-vram to cover low-VRAM and face-free modes.
+
 from __future__ import annotations
 
 import math
@@ -236,6 +238,51 @@ def test_face_stage_loads_in_its_own_dtype_when_the_global_stage_differs(monkeyp
     # Z-Image is the one that crashed; SAM never did, but it read the same wrong field.
     assert captured["zimage"] == torch.bfloat16
     assert captured["sam"] == torch.bfloat16
+
+
+@pytest.mark.parametrize("disable_tiling", [False, True])
+def test_sdxl_cpu_offload_can_disable_only_vae_tiling(monkeypatch, disable_tiling):
+    """Quality mode keeps the memory-safe hooks but skips tiled VAE processing."""
+    import diffusers
+    import huggingface_hub
+    import torch
+
+    from remove_ai_watermarks._internal import sdxl_zimage_pipeline as module
+
+    pipe = MagicMock()
+    monkeypatch.setattr(module, "_cached_repo_or_id", lambda model_id, _anchor, _token: model_id)
+    monkeypatch.setattr(diffusers.ControlNetModel, "from_pretrained", MagicMock(return_value=MagicMock()))
+    monkeypatch.setattr(diffusers.AutoencoderKL, "from_pretrained", MagicMock(return_value=MagicMock()))
+    monkeypatch.setattr(
+        diffusers.StableDiffusionXLControlNetImg2ImgPipeline,
+        "from_pretrained",
+        MagicMock(return_value=pipe),
+    )
+    monkeypatch.setattr(
+        diffusers.EulerDiscreteScheduler,
+        "from_config",
+        MagicMock(return_value=MagicMock()),
+    )
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", lambda *_args, **_kwargs: "/tmp/lora.safetensors")
+    if disable_tiling:
+        monkeypatch.setenv(module.DISABLE_VAE_TILING_ENV, "1")
+    else:
+        monkeypatch.delenv(module.DISABLE_VAE_TILING_ENV, raising=False)
+
+    pipeline = module.SdxlZImagePipeline(
+        device="cuda",
+        torch_dtype=torch.float16,
+        keep_global_models_on_device=False,
+    )
+    pipeline._load_sdxl()
+
+    pipe.enable_attention_slicing.assert_called_once_with("max")
+    pipe.enable_vae_slicing.assert_called_once_with()
+    pipe.enable_sequential_cpu_offload.assert_called_once_with(device="cuda")
+    if disable_tiling:
+        pipe.enable_vae_tiling.assert_not_called()
+    else:
+        pipe.enable_vae_tiling.assert_called_once_with()
 
 
 def test_resident_face_models_disable_vram_offload():
@@ -698,6 +745,32 @@ def test_tiled_verified_text_runs_vae_donor_per_tile(monkeypatch):
     assert restore.call_args.args[0].size == (96, 80)
     assert restore.call_args.args[1].size == (96, 80)
     assert restore.call_args.args[2].size == (96, 80)
+
+
+def test_skip_face_stage_env_never_checks_for_faces(monkeypatch):
+    from remove_ai_watermarks._internal import qwen_zimage_pipeline
+    from remove_ai_watermarks._internal.qwen_zimage_pipeline import (
+        SKIP_FACE_STAGE_ENV,
+        QwenZImagePipeline,
+    )
+
+    source = Image.new("RGB", (32, 32), (10, 20, 30))
+    global_result = Image.new("RGB", (32, 32), (70, 80, 90))
+    runtime = QwenZImagePipeline(device="cuda", torch_dtype="bf16")
+    monkeypatch.setattr(runtime, "_require_cuda", lambda: None)
+    monkeypatch.setattr(runtime, "_run_global", MagicMock(return_value=global_result))
+    face_detector = MagicMock(side_effect=AssertionError("face detector must not run"))
+    monkeypatch.setattr(qwen_zimage_pipeline, "detect_faces", face_detector)
+    monkeypatch.setattr(runtime, "_sam_masks", MagicMock(side_effect=AssertionError("SAM must not run")))
+    monkeypatch.setattr(runtime, "_run_faces", MagicMock(side_effect=AssertionError("Z-Image must not run")))
+    monkeypatch.setenv(SKIP_FACE_STAGE_ENV, "1")
+
+    result = runtime.run(source, strength=0.15, seed=0)
+
+    assert result is global_result
+    face_detector.assert_not_called()
+    runtime._sam_masks.assert_not_called()
+    runtime._run_faces.assert_not_called()
 
 
 def test_watermark_remover_dispatches_to_full_pipeline(tmp_path, monkeypatch):

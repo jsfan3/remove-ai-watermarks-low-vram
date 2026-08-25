@@ -6,6 +6,9 @@ strength policy, detector, masks, prompts, and compositing are implemented here 
 this library's Pillow and DiffSynth runtime.
 """
 
+# Modified by remove-ai-watermarks-low-vram: allow the face stage to be skipped
+# entirely so its detector, SAM, and Z-Image models are never loaded.
+
 # DiffSynth, torch, transformers, and cv2 expose mostly untyped tensor/array APIs.
 # Keep the relaxation local to this optional ML boundary.
 # pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportMissingTypeArgument=false, reportMissingTypeStubs=false, reportMissingImports=false, reportArgumentType=false, reportAssignmentType=false, reportReturnType=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalMemberAccess=false, reportOptionalCall=false, reportOptionalSubscript=false, reportOptionalOperand=false, reportAttributeAccessIssue=false, reportPrivateImportUsage=false, reportPrivateUsage=false, reportUnnecessaryComparison=false
@@ -64,6 +67,7 @@ RESIDENT_FACE_MODEL_MIN_VRAM_GIB = 64.0
 # plausible but unvalidated. Benchmark in docs/module-internals.md, "CPU offload".
 RESIDENT_GLOBAL_MODEL_MIN_VRAM_GIB = 64.0
 FACE_DENOISE_SCALE = 0.5
+SKIP_FACE_STAGE_ENV = "REMOVE_AI_WATERMARKS_SKIP_FACE_STAGE"
 
 # Both stages prompt with compile-time constants, and at CFG 1.0 DiffSynth reuses the
 # positive embedding for the negative side instead of encoding it, so exactly one
@@ -1113,22 +1117,32 @@ class QwenZImagePipeline:
         else:
             global_result = self._run_global(image, global_strength, seed)
 
-        self._progress("Detecting faces on the original image...")
-        boxes = detect_faces(image)
-        if not boxes:
-            self._progress("No faces detected; keeping the Qwen global result.")
+        skip_face_stage = os.environ.get(SKIP_FACE_STAGE_ENV, "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if skip_face_stage:
+            self._progress("Face stage disabled; skipping face detection and keeping the global result.")
             result = global_result
         else:
-            masks = self._sam_masks(image, boxes)
-            face_strength = largest_face_denoise(boxes, image.size) * FACE_DENOISE_SCALE
-            result = self._run_faces(
-                image,
-                global_result,
-                boxes,
-                masks,
-                strength=face_strength,
-                seed=seed,
-            )
+            self._progress("Detecting faces on the original image...")
+            boxes = detect_faces(image)
+            if not boxes:
+                self._progress("No faces detected; keeping the Qwen global result.")
+                result = global_result
+            else:
+                masks = self._sam_masks(image, boxes)
+                face_strength = largest_face_denoise(boxes, image.size) * FACE_DENOISE_SCALE
+                result = self._run_faces(
+                    image,
+                    global_result,
+                    boxes,
+                    masks,
+                    strength=face_strength,
+                    seed=seed,
+                )
         if text_manifest is None:
             return result
         if donor is None:

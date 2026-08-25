@@ -1,5 +1,7 @@
 """Tests for AI metadata detection and removal."""
 
+# Modified by remove-ai-watermarks-low-vram to cover its JPEG preservation setting.
+
 from __future__ import annotations
 
 import shutil
@@ -685,9 +687,8 @@ class TestRemoveAiMetadata:
 
         with Image.open(jpg_path) as out:
             assert get_sampling(out) == 0  # 4:4:4, no chroma subsampling
-            # quality 95 quantization tables stay well below the q75 defaults
-            # (whose max quant value is ~40+); q95 tops out around 12.
-            assert max(max(t) for t in out.quantization.values()) <= 15
+            # Quality 100 uses the least destructive JPEG quantization tables.
+            assert max(max(t) for t in out.quantization.values()) <= 1
 
     def test_webp_output_preserves_format_losslessly(self, tmp_path):
         """A .webp output keeps the WebP format (not silently rewritten to PNG)

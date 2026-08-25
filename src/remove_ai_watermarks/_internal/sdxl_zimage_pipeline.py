@@ -11,6 +11,9 @@ it too, which is the part that is easy to miss: an SDXL global pass leaves Synth
 at the strength Qwen needs. See ``watermark_profiles.SDXL_ZIMAGE_OPENAI_STRENGTH``.
 """
 
+# Modified by remove-ai-watermarks-low-vram: cached selective snapshots,
+# sequential CPU offload, attention/VAE slicing, and optional VAE tiling.
+
 # Diffusers and torch expose mostly untyped tensor APIs. Keep the relaxation local
 # to this optional ML boundary.
 # pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportMissingTypeArgument=false, reportMissingTypeStubs=false, reportMissingImports=false, reportArgumentType=false, reportAssignmentType=false, reportReturnType=false, reportCallIssue=false, reportAttributeAccessIssue=false, reportPrivateUsage=false, reportPrivateImportUsage=false
@@ -18,7 +21,9 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from PIL import Image
@@ -38,8 +43,28 @@ from remove_ai_watermarks._internal.watermark_profiles import (
 log = logging.getLogger(__name__)
 
 SDXL_VAE_MODEL_ID = "madebyollin/sdxl-vae-fp16-fix"
+DISABLE_VAE_TILING_ENV = "REMOVE_AI_WATERMARKS_DISABLE_VAE_TILING"
 # SDXL aligns to an 8-pixel latent grid, against Qwen's 16.
 _LATENT_GRID = 8
+
+
+def _cached_repo_or_id(model_id: str, anchor: str, token: dict[str, str]) -> str:
+    """Prefer an already-cached selective snapshot without completing the repo.
+
+    Newer huggingface_hub versions reject an intentionally selective snapshot in
+    offline mode because README/demo files are absent, even when every file needed
+    by Diffusers is present.  Resolving one cached anchor and passing its directory
+    to ``from_pretrained`` avoids both that false-negative and an unnecessary full
+    repository download.  A machine without the anchor falls back to the normal Hub
+    model id and retains upstream's download behaviour.
+    """
+    from huggingface_hub import hf_hub_download
+
+    try:
+        cached_anchor = hf_hub_download(model_id, anchor, local_files_only=True, **token)
+    except OSError:
+        return model_id
+    return str(Path(cached_anchor).parent)
 
 
 def sdxl_target_size(width: int, height: int) -> tuple[int, int]:
@@ -85,24 +110,48 @@ class SdxlZImagePipeline(QwenZImagePipeline):
 
         self._progress("Loading SDXL, Lightning LoRA, and Canny ControlNet...")
         token = {"token": self.hf_token} if self.hf_token else {}
-        controlnet = ControlNetModel.from_pretrained(CONTROLNET_CANNY_MODEL, torch_dtype=torch.float16, **token)
-        vae = AutoencoderKL.from_pretrained(SDXL_VAE_MODEL_ID, torch_dtype=torch.float16, **token)
+        controlnet_source = _cached_repo_or_id(CONTROLNET_CANNY_MODEL, "config.json", token)
+        vae_source = _cached_repo_or_id(SDXL_VAE_MODEL_ID, "config.json", token)
+        base_source = _cached_repo_or_id(SDXL_MODEL_ID, "model_index.json", token)
+        controlnet = ControlNetModel.from_pretrained(controlnet_source, torch_dtype=torch.float16, **token)
+        vae = AutoencoderKL.from_pretrained(vae_source, torch_dtype=torch.float16, **token)
         pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
-            SDXL_MODEL_ID,
+            base_source,
             controlnet=controlnet,
             vae=vae,
             torch_dtype=torch.float16,
             variant="fp16",
             add_watermarker=False,
             **token,
-        ).to(self.device)
+        )
         # SDXL's own four-step distillation, at the strength its authors document.
         # The reference graph loads the Qwen LoRA at 0.8; carrying that number to a
         # different LoRA on a different architecture would be imitation, not parity.
-        pipe.load_lora_weights(hf_hub_download(SDXL_LIGHTNING_MODEL_ID, SDXL_LIGHTNING_PATTERN, **token))
+        lora_path = Path(hf_hub_download(SDXL_LIGHTNING_MODEL_ID, SDXL_LIGHTNING_PATTERN, **token))
+        pipe.load_lora_weights(lora_path.parent, weight_name=lora_path.name)
         pipe.fuse_lora()
         # SDXL-Lightning is distilled against trailing timestep spacing.
         pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
+        if self.keep_global_models_on_device is False:
+            # The public ``--cpu-offload`` option already maps to this field for
+            # both profiles.  Keep the SDXL stack on CPU until each leaf module is
+            # needed so cards smaller than the combined UNet + ControlNet weights
+            # do not OOM while the pipeline is being constructed.
+            pipe.enable_attention_slicing("max")
+            pipe.enable_vae_slicing()
+            disable_vae_tiling = os.environ.get(DISABLE_VAE_TILING_ENV, "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+            if disable_vae_tiling:
+                self._progress("VAE tiling disabled; using full-frame VAE encode/decode.")
+            else:
+                pipe.enable_vae_tiling()
+            pipe.enable_sequential_cpu_offload(device=self.device)
+        else:
+            pipe.to(self.device)
         self._sdxl_pipe = pipe
         return pipe
 

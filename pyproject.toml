@@ -1,11 +1,13 @@
 [project]
+# Modified by remove-ai-watermarks-low-vram: derivative description, discovery
+# keywords, and repository/upstream links. The upstream package name is retained.
 # This name is the published PyPI distribution, not a local label: changing it
 # strands every `pip install remove-ai-watermarks` and every pinned dependency
 # on it, including the ComfyUI node package. The console script below carries
 # the same weight, since users have it on PATH.
 name = "remove-ai-watermarks"
 version = "0.28.1"
-description = "AI watermark remover for visible, invisible, and provenance marks in images and video"
+description = "Low-VRAM AI watermark remover for legacy NVIDIA GPUs"
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
 license = {text = "Apache-2.0"}
@@ -28,6 +30,8 @@ keywords = [
     "stable-diffusion",
     "comfyui",
     "ai-detection",
+    "low-vram",
+    "legacy-gpu",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -180,7 +184,8 @@ all = ["remove-ai-watermarks[video,heif,detect,trustmark,text-restoration,migan]
 remove-ai-watermarks = "remove_ai_watermarks.cli:main"
 
 [project.urls]
-Repository = "https://github.com/wiltodelta/remove-ai-watermarks"
+Repository = "https://github.com/jsfan3/remove-ai-watermarks-low-vram"
+Upstream = "https://github.com/wiltodelta/remove-ai-watermarks"
 
 [build-system]
 requires = ["hatchling"]

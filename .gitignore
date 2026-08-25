@@ -1,5 +1,6 @@
 # Dependencies
 .venv/
+.venv-text/
 __pycache__/
 *.egg-info/
 dist/
@@ -28,7 +29,13 @@ _refs/
 
 # Downloaded model weights
 yolov8n.pt
+models/
 .coverage
+
+# remove-ai-watermarks-low-vram generated outputs
+*_cleaned.*
+*_cleaned_text.*
+*.text-report.json
 
 # Claude Code local settings
 .claude/settings.local.json
