@@ -100,7 +100,7 @@ diffusion = [
     # on macOS there is no CUDA build and this extra installs only for the
     # non-diffusion imports it shares.
     "torch>=2.0.0",
-    "diffusers>=0.38.0",
+    "diffusers>=0.40.0",
     # diffusers 0.38's auto-pipeline registry imports ``Qwen3VLForConditional
     # Generation`` (its ``nucleusmoe_image`` pipeline), which only exists in
     # transformers 5.x -- so ``from diffusers import AutoPipelineForImage2Image``
@@ -110,7 +110,7 @@ diffusion = [
     # ``RobertaProcessing.__new__() got an unexpected keyword argument 'cls'``.
     # Cap tokenizers to the stable 0.22 line (transformers 5.x accepts
     # >=0.22,<=0.23.0) so the rc is excluded while SDXL still loads.
-    "transformers>=5,<6",
+    "transformers>=5.15.1,<6",
     "tokenizers>=0.22,<0.23",
     "accelerate>=0.25.0",
     "safetensors",
@@ -135,7 +135,7 @@ text-restoration = [
 text-draft = [
     "paddleocr>=3.3.3",
     "paddlepaddle>=3.0.0",
-    "huggingface-hub>=0.20.0",
+    "huggingface-hub>=1.28.0",
 ]
 # Adobe TrustMark decoder -- the open, keyless watermark behind Adobe Durable
 # Content Credentials (soft-binding alg ``com.adobe.trustmark.P``). Optional
@@ -152,8 +152,8 @@ trustmark = [
 # eraser backend needs none of this.
 lama = [
     "remove-ai-watermarks[visible]",
-    "onnxruntime>=1.24.0",
-    "huggingface-hub>=0.20.0",
+    "onnxruntime>=1.29.0",
+    "huggingface-hub>=1.28.0",
 ]
 # Lightweight inpaint backend -- MI-GAN via onnxruntime (andraniksargsyan/migan,
 # MIT). CPU, no torch. Model (~28 MB) downloaded on first use and cached by
@@ -162,8 +162,8 @@ lama = [
 # LaMa, the quality-first `auto` choice, is too large. Same runtime as `lama`.
 migan = [
     "remove-ai-watermarks[visible]",
-    "onnxruntime>=1.24.0",
-    "huggingface-hub>=0.20.0",
+    "onnxruntime>=1.29.0",
+    "huggingface-hub>=1.28.0",
 ]
 dev = [
     "remove-ai-watermarks[video]",
@@ -172,7 +172,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.5.0",
     "packaging>=24.0",
-    "ruff>=0.4.0",
+    "ruff>=0.16.4",
     "pyright>=1.1.0",
     "invisible-watermark>=0.2.0",
 ]
