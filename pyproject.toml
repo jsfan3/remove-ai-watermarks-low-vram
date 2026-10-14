@@ -55,15 +55,15 @@ classifiers = [
 dependencies = [
     "pillow>=10.0.0",
     "piexif>=1.1.3",
-    "click>=8.0.0",
-    "python-dotenv>=1.0.0",
+    "click>=8.5.0",
+    "python-dotenv>=1.2.4",
     # Official C2PA reader (Content Authenticity Initiative, MIT/Apache-2.0). The
     # primary, spec-tracking manifest parser for the identify/metadata path; the
     # hand-rolled caBX/CBOR scanner in _internal/c2pa.py is kept only as a fallback for
     # synthetic/partial blobs the validator rejects. Binary wheel (Rust), but the
     # import is light (no torch/numpy) so it fits the dependency-light identify
     # host. Prebuilt wheels cover the full CI matrix (linux/macos/windows).
-    "c2pa-python>=0.35.0",
+    "c2pa-python>=0.38.0",
 ]
 
 [project.optional-dependencies]
@@ -77,7 +77,7 @@ pixels = [
 # Optional HEIC/AVIF pixel decode. Metadata scanning handles these containers
 # without this plugin; combine `heif` with any pixel feature only when needed.
 heif = [
-    "pillow-heif>=0.13.0",
+    "pillow-heif>=1.8.1",
 ]
 visible = ["remove-ai-watermarks[pixels]"]
 # Video visible removal uses the shared pixel runtime. PyAV packetizes processed
@@ -99,8 +99,8 @@ diffusion = [
     # CPU, MPS or XPU path. The default PyPI wheel carries CUDA on Linux/Windows;
     # on macOS there is no CUDA build and this extra installs only for the
     # non-diffusion imports it shares.
-    "torch>=2.0.0",
-    "diffusers>=0.38.0",
+    "torch>=2.14.1",
+    "diffusers>=0.41.0",
     # diffusers 0.38's auto-pipeline registry imports ``Qwen3VLForConditional
     # Generation`` (its ``nucleusmoe_image`` pipeline), which only exists in
     # transformers 5.x -- so ``from diffusers import AutoPipelineForImage2Image``
@@ -112,7 +112,7 @@ diffusion = [
     # >=0.22,<=0.23.0) so the rc is excluded while SDXL still loads.
     "transformers>=5,<6",
     "tokenizers>=0.22,<0.23",
-    "accelerate>=0.25.0",
+    "accelerate>=1.15.0",
     "safetensors",
 ]
 # Full two-stage high-fidelity profile: Qwen-Image-2512 Lightning + DiffSynth
@@ -121,7 +121,7 @@ diffusion = [
 # additional model stack and DiffSynth runtime are large.
 qwen-zimage = [
     "remove-ai-watermarks[diffusion]",
-    "diffsynth>=2.0.17,<3",
+    "diffsynth>=2.1.9,<3",
     "torchvision>=0.20.0",
 ]
 # Opt-in verified-text reconstruction over qwen-zimage. LaMa removes the changed
@@ -152,7 +152,7 @@ trustmark = [
 # eraser backend needs none of this.
 lama = [
     "remove-ai-watermarks[visible]",
-    "onnxruntime>=1.24.0",
+    "onnxruntime>=1.31.0",
     "huggingface-hub>=0.20.0",
 ]
 # Lightweight inpaint backend -- MI-GAN via onnxruntime (andraniksargsyan/migan,
@@ -162,7 +162,7 @@ lama = [
 # LaMa, the quality-first `auto` choice, is too large. Same runtime as `lama`.
 migan = [
     "remove-ai-watermarks[visible]",
-    "onnxruntime>=1.24.0",
+    "onnxruntime>=1.31.0",
     "huggingface-hub>=0.20.0",
 ]
 dev = [
@@ -172,8 +172,8 @@ dev = [
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.5.0",
     "packaging>=24.0",
-    "ruff>=0.4.0",
-    "pyright>=1.1.0",
+    "ruff>=0.17.0",
+    "pyright>=1.1.414",
     "invisible-watermark>=0.2.0",
 ]
 # ``qwen-zimage`` already pulls ``diffusion``; naming both would suggest diffusion is
